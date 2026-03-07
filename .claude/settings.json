@@ -16,6 +16,15 @@
       "TaskOutput",
       "TaskStop",
       "TaskUpdate",
+      "WebFetch",
+      "WebSearch",
+      "ToolSearch",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "EnterWorktree",
 
       "Bash(git status)",
       "Bash(git status *)",
@@ -254,6 +263,12 @@
       "Bash(python3 *)",
       "Bash(python3 -m *)",
       "Bash(python3 -c *)",
+      "Bash(python3 -m pip *)",
+      "Bash(python3 -m pip install *)",
+      "Bash(python3 -m venv *)",
+      "Bash(python -m pip *)",
+      "Bash(python -m pip install *)",
+      "Bash(python -m venv *)",
       "Bash(pip *)",
       "Bash(pip install *)",
       "Bash(pip list *)",
@@ -325,7 +340,20 @@
 
       "Bash(sleep *)",
       "Bash(time *)",
-      "Bash(watch *)"
+      "Bash(watch *)",
+
+      "Bash(cd *)",
+
+      "Bash(source *)",
+      "Bash(export *)",
+      "Bash(printf *)",
+      "Bash(tree *)",
+      "Bash(tree)",
+      "Bash(type *)",
+      "Bash(command *)",
+      "Bash(clear)",
+      "Bash(cat <<*)",
+      "Bash(tput *)"
     ],
     "deny": [
       "Read(.env)",
