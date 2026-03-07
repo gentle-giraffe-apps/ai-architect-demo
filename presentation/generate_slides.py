@@ -697,6 +697,69 @@ def slide_6(c):
     bottom_message(c, "Each step moves you from AI assistant to AI architect.")
 
 
+# ── Slide 6b: Important Reminders ──
+def slide_6b(c):
+    slide_background(c)
+    btm = slide_title(c, "Important Reminders")
+
+    avail_top = btm - 40
+    left_margin = MARGIN + 40
+
+    reminders = [
+        {
+            "number": "1",
+            "title": "Always start Claude from the root directory",
+            "detail": "Otherwise it won't observe .claude/settings.json",
+            "detail2": "and every command will trigger a permission prompt.",
+        },
+        {
+            "number": "2",
+            "title": "Make CLAUDE.md read settings.json immediately",
+            "detail": "Add a prominent rule at the top of CLAUDE.md:",
+            "detail2": '"Read .claude/settings.json before anything else."',
+        },
+        {
+            "number": "3",
+            "title": "Cancel ralph loops when finished",
+            "detail": 'Run /ralph-loop:cancel-ralph after each loop ends.',
+            "detail2": "Prevents accidental restarts in the next session.",
+        },
+    ]
+
+    step_h = 110
+    start_y = avail_top
+
+    for i, rem in enumerate(reminders):
+        sy = start_y - i * step_h
+
+        # Number circle
+        circle_x = left_margin + 20
+        circle_y = sy - 10
+        c.saveState()
+        c.setFillColor(ACCENT)
+        c.circle(circle_x, circle_y, 22, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(circle_x, circle_y - 9, rem["number"])
+        c.restoreState()
+
+        # Title
+        text_x = circle_x + 40
+        c.saveState()
+        c.setFont("Helvetica-Bold", 26)
+        c.setFillColor(DARK)
+        c.drawString(text_x, sy, rem["title"])
+
+        # Detail lines
+        c.setFont("Helvetica", 20)
+        c.setFillColor(GRAY)
+        c.drawString(text_x, sy - 32, rem["detail"])
+        c.drawString(text_x, sy - 56, rem["detail2"])
+        c.restoreState()
+
+    bottom_message(c, "Get these right to reduce interruptions — then iterate as you discover gaps.")
+
+
 # ── Slide 7: Discussion ──
 def slide_7(c):
     slide_background(c)
@@ -737,7 +800,7 @@ def slide_7(c):
 def main():
     c = canvas.Canvas(OUTPUT, pagesize=(SLIDE_W, SLIDE_H))
 
-    slides = [slide_1, slide_2, slide_2b, slide_2c, slide_3, slide_4, slide_5, slide_6, slide_7]
+    slides = [slide_1, slide_2, slide_2b, slide_2c, slide_3, slide_4, slide_5, slide_6, slide_6b, slide_7]
     for i, slide_fn in enumerate(slides):
         slide_fn(c)
         if i < len(slides) - 1:
