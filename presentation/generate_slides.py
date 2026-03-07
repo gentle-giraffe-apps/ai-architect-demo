@@ -282,6 +282,123 @@ def slide_2b(c):
     c.restoreState()
 
 
+# ── Slide 2c: Teaching Your AI the Rules ──
+def slide_2c(c):
+    slide_background(c)
+    btm = slide_title(c, "Teaching Your AI the Rules")
+
+    # Two-column layout: left = CLAUDE.md snippet, right = key principles
+    col_gap = 40
+    col_w = (SLIDE_W - 2 * MARGIN - col_gap) / 2
+    left_x = MARGIN
+    right_x = MARGIN + col_w + col_gap
+
+    # Left column: CLAUDE.md terminal snippet
+    term_top = btm + 30
+    term_h = 350
+    term_y = term_top - term_h
+
+    TERM_BG = HexColor("#1e1e1e")
+    TERM_WHITE = HexColor("#d4d4d4")
+    TERM_GREEN = HexColor("#4ec9b0")
+    TERM_YELLOW = HexColor("#dcdcaa")
+    TERM_ORANGE = HexColor("#ce9178")
+    TERM_GRAY = HexColor("#808080")
+
+    draw_rounded_rect(c, left_x, term_y, col_w, term_h, r=12, fill_color=TERM_BG)
+
+    tx = left_x + 18
+    ty = term_y + term_h - 28
+    line_h = 17
+
+    c.saveState()
+    c.setFont("Courier", 10)
+
+    claude_md_lines = [
+        (TERM_GRAY,   "# CLAUDE.md"),
+        (TERM_WHITE,  ""),
+        (TERM_GREEN,  "## Commands to Avoid"),
+        (TERM_WHITE,  ""),
+        (TERM_WHITE,  "| Avoid       | Workaround          |"),
+        (TERM_WHITE,  "|-------------|---------------------|"),
+        (TERM_ORANGE, "| curl, wget  | Use WebFetch tool   |"),
+        (TERM_ORANGE, "| ssh, scp    | Ask user to run     |"),
+        (TERM_ORANGE, "| docker      | Ask user to run     |"),
+        (TERM_ORANGE, "| git --force | Use safe variants   |"),
+        (TERM_ORANGE, "| kill        | Ask user to run     |"),
+        (TERM_WHITE,  ""),
+        (TERM_GREEN,  "## General Rules"),
+        (TERM_WHITE,  ""),
+        (TERM_YELLOW, "- Prefer tools over Bash"),
+        (TERM_YELLOW, "  (Read not cat, Grep not grep)"),
+        (TERM_YELLOW, "- When in doubt, don't run it"),
+        (TERM_YELLOW, "- Never guess at permissions"),
+    ]
+
+    for color, line in claude_md_lines:
+        c.setFillColor(color)
+        c.drawString(tx, ty, line)
+        ty -= line_h
+
+    c.restoreState()
+
+    # Right column: key principles
+    right_cx = right_x + col_w / 2
+    principle_top = term_top - 10
+
+    c.saveState()
+    c.setFont("Helvetica-Bold", 24)
+    c.setFillColor(ACCENT)
+    c.drawCentredString(right_cx, principle_top, "Two-Layer Defense")
+    c.restoreState()
+
+    # Layer 1 box
+    box_w = col_w - 40
+    box_x = right_x + 20
+    box1_y = principle_top - 80
+    box1_h = 70
+    draw_rounded_rect(c, box_x, box1_y, box_w, box1_h, r=10, fill_color=HexColor("#f0f8ff"), stroke_color=ACCENT)
+    c.saveState()
+    c.setFont("Helvetica-Bold", 18)
+    c.setFillColor(DARK)
+    c.drawCentredString(right_cx, box1_y + box1_h - 28, "Layer 1: settings.json")
+    c.setFont("Helvetica", 15)
+    c.setFillColor(GRAY)
+    c.drawCentredString(right_cx, box1_y + box1_h - 52, "Blocks dangerous commands")
+    c.restoreState()
+
+    # Arrow between boxes
+    draw_arrow_down(c, right_cx, box1_y, length=30)
+
+    # Layer 2 box
+    box2_y = box1_y - 30 - box1_h
+    draw_rounded_rect(c, box_x, box2_y, box_w, box1_h, r=10, fill_color=HexColor("#f0fff0"), stroke_color=HexColor("#27ae60"))
+    c.saveState()
+    c.setFont("Helvetica-Bold", 18)
+    c.setFillColor(DARK)
+    c.drawCentredString(right_cx, box2_y + box1_h - 28, "Layer 2: CLAUDE.md")
+    c.setFont("Helvetica", 15)
+    c.setFillColor(GRAY)
+    c.drawCentredString(right_cx, box2_y + box1_h - 52, "Teaches AI safe workarounds")
+    c.restoreState()
+
+    # Key takeaway bullets below
+    takeaway_y = box2_y - 40
+    takeaways = [
+        "Don't just block — teach",
+        "AI learns to self-correct",
+        "Loops run longer unattended",
+    ]
+    c.saveState()
+    c.setFont("Helvetica-Bold", 17)
+    c.setFillColor(DARK)
+    for i, t in enumerate(takeaways):
+        c.drawCentredString(right_cx, takeaway_y - i * 28, t)
+    c.restoreState()
+
+    bottom_message(c, "CLAUDE.md + settings.json = unattended loops that don't stall.", font_size=22)
+
+
 # ── Slide 3: The Ralph Loop ──
 def slide_3(c):
     slide_background(c)
@@ -541,7 +658,7 @@ def slide_6(c):
 def main():
     c = canvas.Canvas(OUTPUT, pagesize=(SLIDE_W, SLIDE_H))
 
-    slides = [slide_1, slide_2, slide_2b, slide_3, slide_4, slide_5, slide_6]
+    slides = [slide_1, slide_2, slide_2b, slide_2c, slide_3, slide_4, slide_5, slide_6]
     for i, slide_fn in enumerate(slides):
         slide_fn(c)
         if i < len(slides) - 1:
