@@ -1,15 +1,17 @@
 """Fractal Surfer - An arcade-style Julia set exploration game."""
 
 import pygame
+import numpy as np
 import math
 import random
 import sys
+from collections import deque
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-GRID_W, GRID_H = 120, 120
-TILE = 6
+GRID_W, GRID_H = 400, 400
+TILE = 2
 WIN_W, WIN_H = GRID_W * TILE, GRID_H * TILE
 TITLE_HEIGHT = 36
 HUD_HEIGHT = 48
@@ -30,9 +32,9 @@ TRAIL_LENGTH = 20
 
 # Energy
 MAX_ENERGY = 100.0
-BASE_DRAIN = 0.10
-CHAOS_DRAIN = 0.55
-STABLE_RESTORE = 0.30
+BASE_DRAIN = 0.02
+CHAOS_DRAIN = 0.08
+STABLE_RESTORE = 2.0
 NODE_RESTORE = 25.0
 
 # Scoring
@@ -40,7 +42,7 @@ BOUNDARY_BONUS = 5
 TIME_SCORE = 1
 
 # Difficulty
-DIFFICULTY_INTERVAL = 30.0
+DIFFICULTY_INTERVAL = 120.0
 
 # Colors
 COL_BG = (6, 4, 16)
@@ -68,31 +70,29 @@ def _lerp_color(c1, c2, f):
 
 def build_palette(size=256):
     """Build a cosmic nebula palette matching the concept art."""
-    # Color stops matching the concept art's cosmic nebula look
     stops = [
-        (0.00, (2, 1, 12)),       # near-black
-        (0.04, (8, 4, 40)),       # very dark indigo
-        (0.10, (15, 8, 70)),      # dark purple
-        (0.16, (40, 15, 120)),    # purple
-        (0.22, (80, 10, 160)),    # bright purple
-        (0.28, (30, 60, 180)),    # blue-purple
-        (0.34, (10, 120, 200)),   # blue
-        (0.40, (0, 180, 230)),    # cyan
-        (0.46, (10, 220, 180)),   # cyan-green
-        (0.52, (60, 250, 100)),   # green
-        (0.58, (180, 255, 40)),   # yellow-green
-        (0.64, (255, 240, 20)),   # yellow
-        (0.70, (255, 180, 10)),   # gold
-        (0.76, (255, 100, 10)),   # orange
-        (0.82, (255, 40, 40)),    # red
-        (0.88, (220, 20, 120)),   # magenta
-        (0.94, (140, 10, 160)),   # dark magenta
-        (1.00, (2, 1, 12)),       # back to black
+        (0.00, (2, 1, 12)),
+        (0.04, (8, 4, 40)),
+        (0.10, (15, 8, 70)),
+        (0.16, (40, 15, 120)),
+        (0.22, (80, 10, 160)),
+        (0.28, (30, 60, 180)),
+        (0.34, (10, 120, 200)),
+        (0.40, (0, 180, 230)),
+        (0.46, (10, 220, 180)),
+        (0.52, (60, 250, 100)),
+        (0.58, (180, 255, 40)),
+        (0.64, (255, 240, 20)),
+        (0.70, (255, 180, 10)),
+        (0.76, (255, 100, 10)),
+        (0.82, (255, 40, 40)),
+        (0.88, (220, 20, 120)),
+        (0.94, (140, 10, 160)),
+        (1.00, (2, 1, 12)),
     ]
     palette = []
     for i in range(size):
         t = i / size
-        # Find surrounding stops
         for si in range(len(stops) - 1):
             if stops[si][0] <= t <= stops[si + 1][0]:
                 span = stops[si + 1][0] - stops[si][0]
@@ -108,20 +108,70 @@ def build_palette(size=256):
 PALETTE = build_palette(256)
 INSIDE_COLOR = (3, 1, 10)
 
+# Build numpy palette lookup table (256 x 3)
+PALETTE_ARRAY = np.array(PALETTE, dtype=np.uint8)
+INSIDE_ARRAY = np.array(INSIDE_COLOR, dtype=np.uint8)
+
+# Precompute grid coordinates in complex plane
+_gx = np.arange(GRID_W, dtype=np.float64)
+_gy = np.arange(GRID_H, dtype=np.float64)
+GRID_ZR = (_gx / GRID_W - 0.5) * 2 * FRAC_RANGE  # shape (GRID_W,)
+GRID_ZI = (_gy / GRID_H - 0.5) * 2 * FRAC_RANGE  # shape (GRID_H,)
+# Full 2D grids: ZR_GRID[y, x], ZI_GRID[y, x]
+ZR_GRID, ZI_GRID = np.meshgrid(GRID_ZR, GRID_ZI)
+
 
 def julia_escape(zr, zi, cr, ci, max_iter):
-    """Return escape iteration count (0 = inside set)."""
+    """Return smooth escape iteration count (0 = inside set).
+
+    Scalar version used for single-point terrain queries.
+    """
     for n in range(max_iter):
         zr2 = zr * zr
         zi2 = zi * zi
         if zr2 + zi2 > 4.0:
             mag = zr2 + zi2
-            if mag > 1.0:
-                return n + 1 - math.log(math.log(mag)) / math.log(2)
-            return n
+            smooth = n + 1 - math.log(math.log(mag)) / math.log(2)
+            return max(smooth, 0.001)
         zi = 2.0 * zr * zi + ci
         zr = zr2 - zi2 + cr
     return 0
+
+
+def julia_escape_numpy(cr, ci, max_iter):
+    """Vectorized Julia set computation over the entire grid.
+
+    Returns a float64 array of shape (GRID_H, GRID_W) with smooth escape values.
+    0 means inside the set.
+    """
+    zr = ZR_GRID.copy()
+    zi = ZI_GRID.copy()
+    escape = np.zeros((GRID_H, GRID_W), dtype=np.float64)
+    alive = np.ones((GRID_H, GRID_W), dtype=bool)
+
+    for n in range(max_iter):
+        zr2 = zr * zr
+        zi2 = zi * zi
+        mag = zr2 + zi2
+
+        # Points that just escaped this iteration
+        escaped = alive & (mag > 4.0)
+        if np.any(escaped):
+            log_mag = np.log(np.maximum(mag[escaped], 1e-10))
+            smooth = n + 1 - np.log(np.maximum(log_mag, 1e-10)) / np.log(2)
+            escape[escaped] = np.maximum(smooth, 0.001)
+            alive[escaped] = False
+
+        if not np.any(alive):
+            break
+
+        # Iterate: z = z^2 + c
+        zi_new = 2.0 * zr * zi + ci
+        zr_new = zr2 - zi2 + cr
+        zr[alive] = zr_new[alive]
+        zi[alive] = zi_new[alive]
+
+    return escape
 
 
 class EnergyNode:
@@ -144,9 +194,11 @@ class Game:
         self.font_med = pygame.font.Font(None, 28)
         self.font_small = pygame.font.Font(None, 22)
         # Build star field for inside-set regions
-        self._stars = set()
+        self._star_mask = np.zeros((GRID_H, GRID_W), dtype=bool)
         for _ in range(200):
-            self._stars.add((random.randint(0, GRID_W - 1), random.randint(0, GRID_H - 1)))
+            sx = random.randint(0, GRID_W - 1)
+            sy = random.randint(0, GRID_H - 1)
+            self._star_mask[sy, sx] = True
         self.reset()
 
     def reset(self):
@@ -156,9 +208,9 @@ class Game:
         self.score = 0
         self.time_alive = 0.0
         self.game_over = False
-        self.anim_time = 8.0  # start at a visually interesting c
+        self.anim_time = 8.0
         self.difficulty = 1.0
-        self.trail = []
+        self.trail = deque(maxlen=TRAIL_LENGTH)
         self.dash_timer = 0
         self.dash_cooldown = 0
         self.dash_dx = 0
@@ -167,14 +219,7 @@ class Game:
         self.node_timer = 0
         self.frame_count = 0
         self.color_offset = 0.0
-        self._grid_cache = []
-        for gy in range(GRID_H):
-            row = []
-            for gx in range(GRID_W):
-                zr = (gx / GRID_W - 0.5) * 2 * FRAC_RANGE
-                zi = (gy / GRID_H - 0.5) * 2 * FRAC_RANGE
-                row.append((zr, zi))
-            self._grid_cache.append(row)
+        self._escape_grid = None
         self._spawn_initial_nodes()
 
     def _spawn_initial_nodes(self):
@@ -188,19 +233,16 @@ class Game:
 
     def _get_c(self):
         t = self.anim_time
-        speed = 0.15 * self.difficulty
-        # Orbit near the Mandelbrot boundary for max detail
-        # Base radius oscillates to cross interesting Julia set regions
+        speed = 0.015 * self.difficulty
         r = 0.7885 + 0.06 * math.sin(t * speed * 2.7)
         cr = r * math.cos(t * speed)
         ci = r * math.sin(t * speed * 0.87)
         return (cr, ci)
 
     def _terrain_value(self, gx, gy):
-        if 0 <= int(gx) < GRID_W and 0 <= int(gy) < GRID_H:
-            zr, zi = self._grid_cache[int(gy)][int(gx)]
-            cr, ci = self._get_c()
-            return julia_escape(zr, zi, cr, ci, MAX_ITER)
+        gxi, gyi = int(gx), int(gy)
+        if 0 <= gxi < GRID_W and 0 <= gyi < GRID_H and self._escape_grid is not None:
+            return self._escape_grid[gyi, gxi]
         return 0
 
     def handle_input(self):
@@ -255,17 +297,18 @@ class Game:
         self.difficulty = 1.0 + self.time_alive / DIFFICULTY_INTERVAL * 0.15
 
         self.trail.append((self.player_x, self.player_y))
-        if len(self.trail) > TRAIL_LENGTH:
-            self.trail.pop(0)
 
         escape_val = self._terrain_value(self.player_x, self.player_y)
 
         if escape_val == 0:
+            # Inside the set — stable region, restore energy
             self.energy += STABLE_RESTORE * self.difficulty
-        elif escape_val < MAX_ITER * 0.3:
+        elif escape_val > MAX_ITER * 0.7:
+            # High iteration count — near boundary, bonus scoring zone
             self.energy -= BASE_DRAIN * self.difficulty
             self.score += BOUNDARY_BONUS
         else:
+            # Low iteration count — escaped quickly, chaotic outer region
             self.energy -= CHAOS_DRAIN * self.difficulty
 
         self.energy -= BASE_DRAIN * 0.5 * self.difficulty
@@ -279,7 +322,7 @@ class Game:
         for node in self.nodes:
             if node.alive:
                 dist = abs(node.gx - px) + abs(node.gy - py)
-                if dist < 3:
+                if dist < 24:
                     node.alive = False
                     self.energy = min(MAX_ENERGY, self.energy + NODE_RESTORE)
                     self.score += 500
@@ -297,28 +340,38 @@ class Game:
     def render_fractal(self):
         cr, ci = self._get_c()
         color_off = int(self.color_offset) % 256
-        pxa = pygame.PixelArray(self.fractal_surface)
 
-        for gy in range(GRID_H):
-            row = self._grid_cache[gy]
-            for gx in range(GRID_W):
-                zr, zi = row[gx]
-                val = julia_escape(zr, zi, cr, ci, MAX_ITER)
-                if val == 0:
-                    # Inside set - dark with occasional stars
-                    if (gx, gy) in self._stars:
-                        bright = 30 + int(20 * math.sin(self.color_offset * 0.3 + gx * 0.5))
-                        color = (bright, bright, bright + 10)
-                    else:
-                        color = INSIDE_COLOR
-                else:
-                    # Spread across more palette for variety
-                    norm = val / MAX_ITER
-                    idx = int((norm * 512 + color_off)) % 256
-                    color = PALETTE[idx]
-                pxa[gx, gy] = color
+        # Compute escape values for the entire grid using numpy
+        self._escape_grid = julia_escape_numpy(cr, ci, MAX_ITER)
 
-        pxa.close()
+        # Build RGB pixel array
+        pixels = np.zeros((GRID_H, GRID_W, 3), dtype=np.uint8)
+
+        inside = self._escape_grid == 0
+        outside = ~inside
+
+        # Inside set — dark with occasional stars
+        pixels[inside] = INSIDE_ARRAY
+
+        # Stars twinkle
+        star_inside = inside & self._star_mask
+        if np.any(star_inside):
+            # Use grid x-coords for phase variation
+            star_ys, star_xs = np.where(star_inside)
+            bright = 30 + (20 * np.sin(self.color_offset * 0.3 + star_xs * 0.5)).astype(np.int32)
+            bright = np.clip(bright, 0, 255).astype(np.uint8)
+            pixels[star_inside, 0] = bright
+            pixels[star_inside, 1] = bright
+            pixels[star_inside, 2] = np.clip(bright + 10, 0, 255).astype(np.uint8)
+
+        # Outside set — palette lookup
+        if np.any(outside):
+            norm = self._escape_grid[outside] / MAX_ITER
+            idx = ((norm * 512 + color_off) % 256).astype(np.int32)
+            pixels[outside] = PALETTE_ARRAY[idx]
+
+        # Blit to surface
+        pygame.surfarray.blit_array(self.fractal_surface, pixels.transpose(1, 0, 2))
 
     def render(self):
         self.screen.fill(COL_BG)
@@ -334,7 +387,7 @@ class Game:
         scaled = pygame.transform.scale(self.fractal_surface, (WIN_W, WIN_H))
         self.screen.blit(scaled, (0, TITLE_HEIGHT))
 
-        field_y = TITLE_HEIGHT  # offset for all game elements
+        field_y = TITLE_HEIGHT
 
         # Border around fractal
         pygame.draw.rect(self.screen, COL_HUD_BORDER, (0, field_y, WIN_W, WIN_H), 2)
@@ -346,11 +399,11 @@ class Game:
                 brightness = int(180 + 75 * math.sin(node.pulse))
                 sx = int(node.gx * TILE + TILE / 2)
                 sy = int(node.gy * TILE + TILE / 2) + field_y
-                glow_surf = pygame.Surface((TILE * 4, TILE * 4), pygame.SRCALPHA)
-                pygame.draw.circle(glow_surf, (brightness, brightness, 0, 60), (TILE * 2, TILE * 2), TILE * 2)
-                self.screen.blit(glow_surf, (sx - TILE * 2, sy - TILE * 2))
-                pygame.draw.circle(self.screen, (brightness, brightness, 40), (sx, sy), 4)
-                pygame.draw.circle(self.screen, (255, 255, 200), (sx, sy), 2)
+                glow_surf = pygame.Surface((TILE * 8, TILE * 8), pygame.SRCALPHA)
+                pygame.draw.circle(glow_surf, (brightness, brightness, 0, 60), (TILE * 4, TILE * 4), TILE * 4)
+                self.screen.blit(glow_surf, (sx - TILE * 4, sy - TILE * 4))
+                pygame.draw.circle(self.screen, (brightness, brightness, 40), (sx, sy), 8)
+                pygame.draw.circle(self.screen, (255, 255, 200), (sx, sy), 4)
 
         # Trail
         if len(self.trail) > 1:
