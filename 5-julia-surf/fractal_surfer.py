@@ -22,7 +22,7 @@ MAX_ITER = 28
 
 # Fractal viewport in complex plane
 FRAC_RANGE = 1.5
-ZOOM_SPEED = 0.003        # multiplier decay per second (~0.3% smaller each second)
+ZOOM_SPEED = 0.075        # multiplier decay per second (~7.5% smaller each second)
 ZOOM_MIN_RANGE = 0.05     # deepest zoom allowed
 
 # Player
@@ -306,12 +306,30 @@ class Game:
         # Slow zoom — shrink viewport gradually
         self.zoom_range = max(ZOOM_MIN_RANGE, self.zoom_range * (1.0 - ZOOM_SPEED * dt))
 
-        # Gently drift viewport center toward player's complex-plane position
+        # Find interesting zoom target by blending player pos with fractal detail hotspot
         player_r = (self.player_x / GRID_W - 0.5) * 2 * self.zoom_range + self.view_center_r
         player_i = (self.player_y / GRID_H - 0.5) * 2 * self.zoom_range + self.view_center_i
-        drift = 0.02 * dt  # very gentle drift so it's not disorienting
-        self.view_center_r += (player_r - self.view_center_r) * drift
-        self.view_center_i += (player_i - self.view_center_i) * drift
+
+        target_r, target_i = self.view_center_r, self.view_center_i
+        if self._escape_grid is not None:
+            # Compute gradient magnitude to find fractal boundary (detail) regions
+            gy_grad, gx_grad = np.gradient(self._escape_grid)
+            grad_mag = gx_grad * gx_grad + gy_grad * gy_grad
+            # Threshold to top 10% of gradient values
+            threshold = np.percentile(grad_mag, 90)
+            hot = grad_mag > threshold
+            if np.any(hot):
+                hot_ys, hot_xs = np.where(hot)
+                # Centroid of high-detail pixels in grid coords
+                cx = np.mean(hot_xs)
+                cy = np.mean(hot_ys)
+                # Convert grid centroid to complex-plane coords
+                target_r = (cx / GRID_W - 0.5) * 2 * self.zoom_range + self.view_center_r
+                target_i = (cy / GRID_H - 0.5) * 2 * self.zoom_range + self.view_center_i
+
+        drift = 0.05 * dt  # stronger drift to track detail
+        self.view_center_r += (target_r - self.view_center_r) * drift
+        self.view_center_i += (target_i - self.view_center_i) * drift
 
         self.trail.append((self.player_x, self.player_y))
 
@@ -434,29 +452,28 @@ class Game:
                 pygame.draw.circle(self.screen, (brightness, brightness, 40), (sx, sy), 8)
                 pygame.draw.circle(self.screen, (255, 255, 200), (sx, sy), 4)
 
-        # Trail
-        if len(self.trail) > 1:
-            for i in range(1, len(self.trail)):
+        # Engine exhaust trail (short, fading dots instead of long line)
+        if len(self.trail) > 2:
+            for i in range(len(self.trail) - 2):
                 alpha = i / len(self.trail)
-                x1 = int(self.trail[i - 1][0] * TILE + TILE / 2)
-                y1 = int(self.trail[i - 1][1] * TILE + TILE / 2) + field_y
-                x2 = int(self.trail[i][0] * TILE + TILE / 2)
-                y2 = int(self.trail[i][1] * TILE + TILE / 2) + field_y
-                width = max(1, int(alpha * 3))
-                col = (int(100 + 155 * alpha), int(200 + 55 * alpha), 255)
-                pygame.draw.line(self.screen, col, (x1, y1), (x2, y2), width)
+                tx = int(self.trail[i][0] * TILE + TILE / 2)
+                ty = int(self.trail[i][1] * TILE + TILE / 2) + field_y
+                r = max(1, int(alpha * 2))
+                a = int(alpha * 120)
+                dot = pygame.Surface((r * 4, r * 4), pygame.SRCALPHA)
+                pygame.draw.circle(dot, (80, 150, 255, a), (r * 2, r * 2), r)
+                self.screen.blit(dot, (tx - r * 2, ty - r * 2))
 
         # Player ship
         px = int(self.player_x * TILE + TILE / 2)
         py = int(self.player_y * TILE + TILE / 2) + field_y
 
         # Glow
-        glow_surf = pygame.Surface((44, 44), pygame.SRCALPHA)
-        pygame.draw.circle(glow_surf, (80, 160, 255, 40), (22, 22), 20)
-        pygame.draw.circle(glow_surf, (140, 210, 255, 70), (22, 22), 12)
-        self.screen.blit(glow_surf, (px - 22, py - 22))
+        glow_surf = pygame.Surface((32, 32), pygame.SRCALPHA)
+        pygame.draw.circle(glow_surf, (80, 160, 255, 30), (16, 16), 14)
+        self.screen.blit(glow_surf, (px - 16, py - 16))
 
-        # Ship triangle
+        # Asteroids-style ship: hollow wedge shape
         dx, dy = 0, 0
         if len(self.trail) >= 2:
             dx = self.trail[-1][0] - self.trail[-2][0]
@@ -465,12 +482,26 @@ class Game:
             dx = 1
 
         angle = math.atan2(dy, dx)
-        size = 8
-        p1 = (px + int(math.cos(angle) * size), py + int(math.sin(angle) * size))
-        p2 = (px + int(math.cos(angle + 2.5) * size * 0.6), py + int(math.sin(angle + 2.5) * size * 0.6))
-        p3 = (px + int(math.cos(angle - 2.5) * size * 0.6), py + int(math.sin(angle - 2.5) * size * 0.6))
-        pygame.draw.polygon(self.screen, COL_WHITE, [p1, p2, p3])
-        pygame.draw.circle(self.screen, (200, 230, 255), (px, py), 2)
+        size = 10
+
+        # Nose
+        nose = (px + int(math.cos(angle) * size),
+                py + int(math.sin(angle) * size))
+        # Left wing
+        lwing = (px + int(math.cos(angle + 2.4) * size * 0.75),
+                 py + int(math.sin(angle + 2.4) * size * 0.75))
+        # Right wing
+        rwing = (px + int(math.cos(angle - 2.4) * size * 0.75),
+                 py + int(math.sin(angle - 2.4) * size * 0.75))
+        # Rear indent (the notch in the back, like Asteroids)
+        rear = (px + int(math.cos(angle + math.pi) * size * 0.35),
+                py + int(math.sin(angle + math.pi) * size * 0.35))
+
+        # Draw outline only (hollow, like classic Asteroids)
+        pygame.draw.lines(self.screen, COL_WHITE, False,
+                          [lwing, nose, rwing], 2)
+        pygame.draw.line(self.screen, COL_WHITE, lwing, rear, 2)
+        pygame.draw.line(self.screen, COL_WHITE, rwing, rear, 2)
 
         # Dash ring
         if self.dash_timer > 0:
