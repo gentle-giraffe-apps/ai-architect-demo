@@ -656,6 +656,147 @@ def slide_4b(c):
     bottom_message(c, "Guided setup — PAUL asks questions before writing any code.", font_size=22)
 
 
+# ── Slide 4c: GSD – Get Shit Done ──
+def slide_4c(c):
+    slide_background(c)
+    btm = slide_title(c, "GSD: Get Shit Done")
+
+    content_top = btm - 15
+    col_gap = 40
+    col_w = (SLIDE_W - 2 * MARGIN - col_gap) / 2
+    left_x = MARGIN
+    right_x = MARGIN + col_w + col_gap
+
+    # ── Left column: What GSD is ──
+    c.saveState()
+    c.setFont("Helvetica-Bold", 20)
+    c.setFillColor(ACCENT)
+    c.drawString(left_x + 20, content_top, "The Heavy Hitter")
+    c.restoreState()
+
+    desc_lines = [
+        ("normal", "Full meta-prompting & context"),
+        ("normal", "engineering system for Claude Code."),
+        ("normal", ""),
+        ("normal", "Multi-agent orchestration:"),
+        ("bold",   "4 parallel research agents"),
+        ("bold",   "Planner + checker loop"),
+        ("bold",   "Dependency-aware wave execution"),
+        ("bold",   "Fresh 200k context per task"),
+        ("normal", ""),
+        ("normal", "Atomic git commits per task."),
+        ("normal", "Automated verification built in."),
+    ]
+
+    c.saveState()
+    dy = content_top - 28
+    for style, line in desc_lines:
+        if line == "":
+            dy -= 6
+            continue
+        if style == "bold":
+            c.setFont("Helvetica-Bold", 14)
+            c.setFillColor(DARK)
+            c.drawString(left_x + 32, dy, "• " + line)
+        else:
+            c.setFont("Helvetica", 14)
+            c.setFillColor(GRAY)
+            c.drawString(left_x + 20, dy, line)
+        dy -= 19
+    c.restoreState()
+
+    # Install box
+    install_y = dy - 8
+    install_h = 36
+    TERM_BG = HexColor("#1e1e1e")
+    TERM_GREEN = HexColor("#4ec9b0")
+    draw_rounded_rect(c, left_x + 10, install_y - install_h, col_w - 20, install_h, r=8, fill_color=TERM_BG)
+    c.saveState()
+    c.setFont("Courier", 12)
+    c.setFillColor(TERM_GREEN)
+    c.drawString(left_x + 28, install_y - 24, "$ npx get-shit-done-cc@latest")
+    c.restoreState()
+
+    # ── Right column: Comparison table + caution ──
+    right_cx = right_x + col_w / 2
+
+    c.saveState()
+    c.setFont("Helvetica-Bold", 20)
+    c.setFillColor(ACCENT)
+    c.drawCentredString(right_cx, content_top, "Ralph vs PAUL vs GSD")
+    c.restoreState()
+
+    # Table
+    table_top = content_top - 30
+    row_h = 22
+    col_positions = [right_x + 10, right_x + col_w * 0.32, right_x + col_w * 0.55, right_x + col_w * 0.78]
+
+    headers = ["", "Ralph", "PAUL", "GSD"]
+    rows = [
+        ["Structure", "None", "Phases", "Waves"],
+        ["State", "None", "STATE.md", "Full"],
+        ["Agents", "Single", "Single", "Multi"],
+        ["Planning", "None", "Plan file", "Research+"],
+        ["Tokens", "Low", "Medium", "High"],
+        ["Complexity", "Minimal", "Moderate", "Heavy"],
+        ["Best for", "Polling", "Features", "Full builds"],
+    ]
+
+    # Header row
+    c.saveState()
+    c.setFont("Helvetica-Bold", 12)
+    c.setFillColor(DARK)
+    for j, h in enumerate(headers):
+        c.drawString(col_positions[j], table_top, h)
+    c.restoreState()
+
+    # Divider line
+    c.saveState()
+    c.setStrokeColor(HexColor("#cccccc"))
+    c.setLineWidth(1)
+    c.line(right_x + 10, table_top - 6, right_x + col_w - 10, table_top - 6)
+    c.restoreState()
+
+    # Data rows
+    c.saveState()
+    c.setFont("Helvetica", 11)
+    for i, row in enumerate(rows):
+        ry = table_top - 22 - i * row_h
+        for j, cell in enumerate(row):
+            if j == 0:
+                c.setFont("Helvetica-Bold", 11)
+                c.setFillColor(DARK)
+            else:
+                c.setFont("Helvetica", 11)
+                c.setFillColor(GRAY)
+            c.drawString(col_positions[j], ry, cell)
+    c.restoreState()
+
+    # Caution box
+    caution_top = table_top - 22 - len(rows) * row_h - 15
+    caution_h = 82
+    draw_rounded_rect(c, right_x + 10, caution_top - caution_h, col_w - 20, caution_h,
+                      r=10, fill_color=HexColor("#fff8f0"), stroke_color=HexColor("#e67e22"))
+
+    c.saveState()
+    c.setFont("Helvetica-Bold", 15)
+    c.setFillColor(HexColor("#e67e22"))
+    c.drawString(right_x + 24, caution_top - 20, "Heads Up")
+
+    caution_lines = [
+        "Can burn through tokens quickly",
+        "Multi-agent drift is possible",
+        "Consider starting with PAUL first",
+    ]
+    c.setFont("Helvetica", 12)
+    c.setFillColor(GRAY)
+    for i, line in enumerate(caution_lines):
+        c.drawString(right_x + 24, caution_top - 40 - i * 17, "• " + line)
+    c.restoreState()
+
+    bottom_message(c, "Powerful but heavy — start simple, scale up when you need it.", font_size=22)
+
+
 # ── Slide 5: From Assistant to Architect ──
 def slide_5(c):
     slide_background(c)
@@ -912,7 +1053,7 @@ def slide_7(c):
 def main():
     c = canvas.Canvas(OUTPUT, pagesize=(SLIDE_W, SLIDE_H))
 
-    slides = [slide_1, slide_2, slide_2b, slide_2c, slide_3, slide_4, slide_4b, slide_5, slide_6, slide_6b, slide_7]
+    slides = [slide_1, slide_2, slide_2b, slide_2c, slide_3, slide_4, slide_4b, slide_4c, slide_5, slide_6, slide_6b, slide_7]
     for i, slide_fn in enumerate(slides):
         slide_fn(c)
         if i < len(slides) - 1:
