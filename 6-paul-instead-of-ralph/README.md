@@ -11,25 +11,32 @@ PAUL (Plan-Apply-Unify Loop) is a structured project management framework for Cl
 
 ### Setup
 
-1. Copy the `paul-framework` directory into your Claude config:
+1. Run the installer (works on Mac, Windows, and Linux):
 
 ```bash
-cp -r paul-framework ~/.claude/paul-framework
+npx paul-framework
 ```
 
-2. Add PAUL skills to your project's `CLAUDE.md` or your global Claude settings so the `/paul:*` slash commands are available. The framework registers these skills:
+The installer will prompt you to choose:
+- **Global installation** — installs to `~/.claude/` for use across all projects
+- **Local installation** — installs to `./.claude/` for the current project only
 
-| Command | Purpose |
-|---------|---------|
-| `/paul:init` | Initialize PAUL in a project |
-| `/paul:plan` | Create a plan for the current phase |
-| `/paul:apply` | Execute an approved plan |
-| `/paul:unify` | Reconcile plan vs actual, close the loop |
-| `/paul:progress` | Check status and get next action |
-| `/paul:resume` | Restore context after a session break |
-| `/paul:pause` | Save state for later resumption |
+For non-interactive installs:
 
-3. Verify installation by running `/paul:help` in Claude Code.
+```bash
+npx paul-framework --global    # Install globally
+npx paul-framework --local     # Install locally
+```
+
+2. Verify installation by running `/paul:help` in Claude Code.
+
+> **Note:** You may need to restart Claude Code to reload the slash commands after initial installation.
+
+To update to the latest version:
+
+```bash
+npx paul-framework@latest
+```
 
 ## What is a Ralph Loop?
 
