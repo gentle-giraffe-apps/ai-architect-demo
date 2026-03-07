@@ -1,5 +1,13 @@
 # CLAUDE.md
 
+## ⚠️ MANDATORY FIRST ACTION — DO THIS BEFORE ANYTHING ELSE
+
+**Immediately** read `.claude/settings.json` at the very start of every conversation — before responding to the user, before any other tool call. This is non-negotiable. Do not skip, defer, or forget this step.
+
+## Startup
+
+- Confirm you have read `.claude/settings.json` and are aware of the current permission allowlist.
+
 ## Bash Commands
 
 - **Never chain or pipe commands.** No `&&`, `||`, `;`, or `|`. Run each command as a separate Bash tool call. Combined commands don't match individual permission patterns in `.claude/settings.json` and will trigger permission prompts, which stalls unattended ralph loops.
