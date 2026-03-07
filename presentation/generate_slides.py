@@ -268,17 +268,23 @@ def slide_2b(c):
     c.drawCentredString(SLIDE_W / 2, sol_y, "The fix:  .claude/settings.json")
     c.restoreState()
 
+    # Bold tagline
+    c.saveState()
+    c.setFont("Helvetica-Bold", 26)
+    c.setFillColor(ACCENT)
+    c.drawCentredString(SLIDE_W / 2, sol_y - 38, "Configure once \u2192 loops run unattended.")
+    c.restoreState()
+
     # Advice lines
     advice = [
-        "Build an exhaustive allowlist that balances safety with leniency.",
-        "Expect to adjust permissions as you work through initial projects.",
-        "Without this, no loop can run unattended.",
+        "Allow common dev commands. Block secrets.",
+        "Iterate the allowlist over time as you discover gaps.",
     ]
     c.saveState()
     c.setFont("Helvetica", 19)
     c.setFillColor(GRAY)
     for i, line in enumerate(advice):
-        c.drawCentredString(SLIDE_W / 2, sol_y - 35 - i * 28, line)
+        c.drawCentredString(SLIDE_W / 2, sol_y - 72 - i * 28, line)
     c.restoreState()
 
 
@@ -443,6 +449,16 @@ def slide_3(c):
     c.drawString(loop_x + 46, (top_box_y + bot_box_y) / 2 - 10, "(max iterations)")
     c.restoreState()
 
+    # Key insight text
+    c.saveState()
+    c.setFont("Helvetica-Bold", 22)
+    c.setFillColor(DARK)
+    insight_x = MARGIN + 60
+    insight_y = (top_box_y + bot_box_y) / 2
+    c.drawString(insight_x, insight_y + 10, "Tests fix errors,")
+    c.drawString(insight_x, insight_y - 18, "not humans.")
+    c.restoreState()
+
     bottom_message(c, "ralph-loop: a Claude Code plugin you can install and run today.")
 
 
@@ -515,9 +531,9 @@ def slide_4(c):
     # Observations below terminal
     obs_y = term_y - 40
     observations = [
-        "You define the spec. AI does the work. Tests judge the result.",
-        "No babysitting. Errors trigger the next iteration automatically.",
-        "Set max iterations and a completion promise as guardrails.",
+        "Max iterations — set a budget for how long AI can try.",
+        "Completion promise — the loop stops when the system says it's done.",
+        "Automated retries — errors trigger the next iteration, not you.",
     ]
 
     c.saveState()
@@ -618,8 +634,71 @@ def slide_5(c):
     c.restoreState()
 
 
-# ── Slide 6: Discussion ──
+# ── Slide 6: How to Start ──
 def slide_6(c):
+    slide_background(c)
+    btm = slide_title(c, "How to Start Changing Now")
+
+    avail_top = btm - 40
+    left_margin = MARGIN + 40
+
+    steps = [
+        {
+            "number": "1",
+            "title": "Stop prompting, start looping",
+            "detail": "Use /ralph-loop instead of manual prompts.",
+            "detail2": "Use AI to help you craft the command.",
+        },
+        {
+            "number": "2",
+            "title": "Learn agent orchestration",
+            "detail": "Move from single prompts to subagents",
+            "detail2": "and agent teams.",
+        },
+        {
+            "number": "3",
+            "title": "Let AI configure AI",
+            "detail": "Ask Claude to audit your settings.json +",
+            "detail2": "CLAUDE.md for loop-friendliness.",
+        },
+    ]
+
+    step_h = 110
+    start_y = avail_top
+
+    for i, step in enumerate(steps):
+        sy = start_y - i * step_h
+
+        # Number circle
+        circle_x = left_margin + 20
+        circle_y = sy - 10
+        c.saveState()
+        c.setFillColor(ACCENT)
+        c.circle(circle_x, circle_y, 22, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(circle_x, circle_y - 9, step["number"])
+        c.restoreState()
+
+        # Title
+        text_x = circle_x + 40
+        c.saveState()
+        c.setFont("Helvetica-Bold", 26)
+        c.setFillColor(DARK)
+        c.drawString(text_x, sy, step["title"])
+
+        # Detail lines
+        c.setFont("Helvetica", 20)
+        c.setFillColor(GRAY)
+        c.drawString(text_x, sy - 32, step["detail"])
+        c.drawString(text_x, sy - 56, step["detail2"])
+        c.restoreState()
+
+    bottom_message(c, "Each step moves you from AI assistant to AI architect.")
+
+
+# ── Slide 7: Discussion ──
+def slide_7(c):
     slide_background(c)
     btm = slide_title(c, "Open Questions")
 
@@ -658,7 +737,7 @@ def slide_6(c):
 def main():
     c = canvas.Canvas(OUTPUT, pagesize=(SLIDE_W, SLIDE_H))
 
-    slides = [slide_1, slide_2, slide_2b, slide_2c, slide_3, slide_4, slide_5, slide_6]
+    slides = [slide_1, slide_2, slide_2b, slide_2c, slide_3, slide_4, slide_5, slide_6, slide_7]
     for i, slide_fn in enumerate(slides):
         slide_fn(c)
         if i < len(slides) - 1:
