@@ -54,6 +54,7 @@
       "Bash(python3 *)",
       "Bash(pip *)",
       "Bash(pip3 *)",
+      "Bash(say *)",
       "Agent",
       "NotebookEdit",
       "LSP",
