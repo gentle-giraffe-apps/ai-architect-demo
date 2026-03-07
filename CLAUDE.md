@@ -8,6 +8,12 @@
 
 - Confirm you have read `.claude/settings.json` and are aware of the current permission allowlist.
 
+## Working Directory
+
+- **Never change the working directory.** Always remain in the project root.
+- Use absolute paths when running scripts: `python3 /full/path/to/script.py`
+- This eliminates the need for `cd`, prevents relative path failures in subsequent commands, and avoids the temptation to chain commands.
+
 ## Bash Commands
 
 - **Never chain or pipe commands.** No `&&`, `||`, `;`, or `|`. Run each command as a separate Bash tool call. Combined commands don't match individual permission patterns in `.claude/settings.json` and will trigger permission prompts, which stalls unattended ralph loops.
