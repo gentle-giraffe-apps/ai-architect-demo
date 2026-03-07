@@ -609,6 +609,13 @@ def slide_4b(c):
     c.drawString(left_x + 28, install_y - 44, "$ /paul:help   # verify install")
     c.restoreState()
 
+    # Repo link
+    c.saveState()
+    c.setFont("Helvetica", 12)
+    c.setFillColor(ACCENT)
+    c.drawString(left_x + 20, install_y - install_h - 18, "github.com/ChristopherKahler/paul")
+    c.restoreState()
+
     # ── Right column: Interactive Init Flow ──
     c.saveState()
     c.setFont("Helvetica-Bold", 22)

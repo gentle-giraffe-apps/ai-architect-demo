@@ -1,5 +1,7 @@
 # PAUL Instead of Ralph
 
+**Repo:** [github.com/ChristopherKahler/paul](https://github.com/ChristopherKahler/paul)
+
 PAUL (Plan-Apply-Unify Loop) is a structured project management framework for Claude Code. Instead of running a simple recurring prompt, PAUL breaks work into milestones, phases, and plans — each with explicit acceptance criteria, boundaries, and verification steps. The result is predictable, trackable AI-assisted development with clear progress visibility.
 
 ## Installation
