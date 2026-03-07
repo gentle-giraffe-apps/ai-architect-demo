@@ -135,13 +135,29 @@ c = complex(
 
 This creates smooth evolving fractal patterns.
 
+### Slow Zoom
+
+The viewport slowly zooms into the fractal over time, revealing finer detail at deeper scales.
+
+The zoom is implemented by gradually shrinking the complex-plane range visible on screen, while gently drifting the viewport center toward the player's position.
+
+Parameters:
+
+- zoom speed: ~0.3% smaller per second (barely perceptible frame-to-frame)
+- viewport drift: very gentle (2% lerp per second toward player)
+- minimum range: 0.05 (prevents floating-point precision issues at extreme depth)
+
+The zoom creates a subtle sense of exploration and forward momentum without being disorienting. As the player zooms deeper, fractal structures become more intricate and fragmented, naturally increasing difficulty since safe zones become smaller and shift more rapidly.
+
+A depth indicator in the title bar shows the current zoom level (e.g. "DEPTH: 3.2x").
+
 ---
 
 ## Rendering System
 
 Resolution:
 
-100 x 100 grid
+400 x 400 grid (vectorized with numpy)
 
 Each grid cell represents a sample of the fractal.
 
@@ -153,7 +169,7 @@ Each frame:
 4. Convert escape value into color
 5. draw pixel or tile
 
-The grid can be scaled up visually to fill a window around 600x600 pixels.
+The grid is rendered at 800x800 pixels (TILE=2). Fractal computation is vectorized using numpy for interactive frame rates at high resolution.
 
 ---
 
@@ -362,9 +378,9 @@ The project is successful if:
 Possible optional improvements include:
 
 - particle trails
-- fractal zoom exploration
+- ~~fractal zoom exploration~~ (implemented — slow auto-zoom with viewport drift)
 - enemy entities
-- power-ups
+- ~~power-ups~~ (implemented — energy nodes)
 - sound effects
 - leaderboard scoring
 

@@ -22,6 +22,8 @@ MAX_ITER = 28
 
 # Fractal viewport in complex plane
 FRAC_RANGE = 1.5
+ZOOM_SPEED = 0.003        # multiplier decay per second (~0.3% smaller each second)
+ZOOM_MIN_RANGE = 0.05     # deepest zoom allowed
 
 # Player
 PLAYER_SPEED = 1.8
@@ -138,14 +140,14 @@ def julia_escape(zr, zi, cr, ci, max_iter):
     return 0
 
 
-def julia_escape_numpy(cr, ci, max_iter):
+def julia_escape_numpy(cr, ci, max_iter, zr_grid=None, zi_grid=None):
     """Vectorized Julia set computation over the entire grid.
 
     Returns a float64 array of shape (GRID_H, GRID_W) with smooth escape values.
     0 means inside the set.
     """
-    zr = ZR_GRID.copy()
-    zi = ZI_GRID.copy()
+    zr = (zr_grid if zr_grid is not None else ZR_GRID).copy()
+    zi = (zi_grid if zi_grid is not None else ZI_GRID).copy()
     escape = np.zeros((GRID_H, GRID_W), dtype=np.float64)
     alive = np.ones((GRID_H, GRID_W), dtype=bool)
 
@@ -220,6 +222,10 @@ class Game:
         self.frame_count = 0
         self.color_offset = 0.0
         self._escape_grid = None
+        # Zoom state — viewport in complex plane
+        self.zoom_range = FRAC_RANGE
+        self.view_center_r = 0.0
+        self.view_center_i = 0.0
         self._spawn_initial_nodes()
 
     def _spawn_initial_nodes(self):
@@ -240,6 +246,7 @@ class Game:
         return (cr, ci)
 
     def _terrain_value(self, gx, gy):
+        """Look up the pre-computed escape value at a grid position."""
         gxi, gyi = int(gx), int(gy)
         if 0 <= gxi < GRID_W and 0 <= gyi < GRID_H and self._escape_grid is not None:
             return self._escape_grid[gyi, gxi]
@@ -296,6 +303,16 @@ class Game:
 
         self.difficulty = 1.0 + self.time_alive / DIFFICULTY_INTERVAL * 0.15
 
+        # Slow zoom — shrink viewport gradually
+        self.zoom_range = max(ZOOM_MIN_RANGE, self.zoom_range * (1.0 - ZOOM_SPEED * dt))
+
+        # Gently drift viewport center toward player's complex-plane position
+        player_r = (self.player_x / GRID_W - 0.5) * 2 * self.zoom_range + self.view_center_r
+        player_i = (self.player_y / GRID_H - 0.5) * 2 * self.zoom_range + self.view_center_i
+        drift = 0.02 * dt  # very gentle drift so it's not disorienting
+        self.view_center_r += (player_r - self.view_center_r) * drift
+        self.view_center_i += (player_i - self.view_center_i) * drift
+
         self.trail.append((self.player_x, self.player_y))
 
         escape_val = self._terrain_value(self.player_x, self.player_y)
@@ -337,12 +354,21 @@ class Game:
             self.energy = 0
             self.game_over = True
 
+    def _build_zoom_grids(self):
+        """Build complex-plane coordinate grids for current zoom/center."""
+        gx = np.arange(GRID_W, dtype=np.float64)
+        gy = np.arange(GRID_H, dtype=np.float64)
+        zr = (gx / GRID_W - 0.5) * 2 * self.zoom_range + self.view_center_r
+        zi = (gy / GRID_H - 0.5) * 2 * self.zoom_range + self.view_center_i
+        return np.meshgrid(zr, zi)
+
     def render_fractal(self):
         cr, ci = self._get_c()
         color_off = int(self.color_offset) % 256
 
-        # Compute escape values for the entire grid using numpy
-        self._escape_grid = julia_escape_numpy(cr, ci, MAX_ITER)
+        # Build zoomed coordinate grids and compute escape values
+        zr_grid, zi_grid = self._build_zoom_grids()
+        self._escape_grid = julia_escape_numpy(cr, ci, MAX_ITER, zr_grid, zi_grid)
 
         # Build RGB pixel array
         pixels = np.zeros((GRID_H, GRID_W, 3), dtype=np.uint8)
@@ -381,6 +407,9 @@ class Game:
         pygame.draw.line(self.screen, COL_HUD_BORDER, (0, TITLE_HEIGHT - 1), (SCREEN_W, TITLE_HEIGHT - 1), 2)
         title = self.font_title.render("FRACTAL SURFER", True, COL_TITLE)
         self.screen.blit(title, (SCREEN_W // 2 - title.get_width() // 2, 4))
+        zoom_level = FRAC_RANGE / self.zoom_range
+        zoom_text = self.font_small.render(f"DEPTH: {zoom_level:.1f}x", True, (120, 100, 200))
+        self.screen.blit(zoom_text, (SCREEN_W - zoom_text.get_width() - 8, 10))
 
         # --- Fractal field ---
         self.render_fractal()
