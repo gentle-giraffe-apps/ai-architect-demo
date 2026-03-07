@@ -11,7 +11,7 @@ SCREEN_HEIGHT = 600
 GRID_COLS = 10
 CELL_SIZE = SCREEN_WIDTH // GRID_COLS  # 40
 GRID_TOP_Y = 40  # offset from top for title area
-PADDLE_AREA_HEIGHT = 80  # space for paddle + ball + score
+PADDLE_AREA_HEIGHT = 130  # space for paddle + ball + score
 GRID_BOTTOM_Y = SCREEN_HEIGHT - PADDLE_AREA_HEIGHT  # 520
 VISIBLE_ROWS = (GRID_BOTTOM_Y - GRID_TOP_Y) // CELL_SIZE  # 12
 GRID_ROWS = VISIBLE_ROWS  # grid matches visible area
@@ -57,6 +57,10 @@ TETROMINOES = {
 # Spawn timing (frames)
 SPAWN_INTERVAL_INITIAL = 300  # 5 seconds at 60fps
 SPAWN_INTERVAL_MIN = 90       # 1.5 seconds minimum
+
+# Falling piece speed (frames per row drop)
+FALL_SPEED_INITIAL = 8  # drops one row every 8 frames
+FALL_SPEED_MIN = 3
 
 
 
@@ -179,6 +183,62 @@ class Grid:
         return count
 
 
+class FallingPiece:
+    """A tetromino that falls from the top of the grid."""
+
+    def __init__(self, shape_name, target_col, grid):
+        self.shape_name = shape_name
+        self.color = COLORS[shape_name]
+        self.offsets = TETROMINOES[shape_name]
+        self.col = target_col
+        self.row = -max(dr for dr, dc in self.offsets)  # start above grid
+        self.fall_timer = 0
+        self.fall_speed = FALL_SPEED_INITIAL
+        self.landed = False
+        self.grid = grid
+
+    def can_move_to(self, row, col):
+        """Check if piece can occupy the given position."""
+        for dr, dc in self.offsets:
+            r = row + dr
+            c = col + dc
+            if c < 0 or c >= self.grid.cols:
+                return False
+            if r >= self.grid.rows:
+                return False
+            if r >= 0 and self.grid.cells[r][c] is not None:
+                return False
+        return True
+
+    def update(self):
+        """Advance the falling piece. Returns True when it locks in place."""
+        if self.landed:
+            return True
+
+        self.fall_timer += 1
+        if self.fall_timer >= self.fall_speed:
+            self.fall_timer = 0
+            if self.can_move_to(self.row + 1, self.col):
+                self.row += 1
+            else:
+                self._lock()
+                return True
+        return False
+
+    def _lock(self):
+        """Lock the piece into the grid."""
+        self.landed = True
+        for dr, dc in self.offsets:
+            r = self.row + dr
+            c = self.col + dc
+            if 0 <= r < self.grid.rows and 0 <= c < self.grid.cols:
+                self.grid.cells[r][c] = self.color
+
+    def get_cells(self):
+        """Return list of (row, col) positions for drawing."""
+        return [(self.row + dr, self.col + dc) for dr, dc in self.offsets]
+
+
 class Ball:
     def __init__(self, x, y, speed=BALL_SPEED_INITIAL):
         self.x = float(x)
@@ -264,8 +324,10 @@ class Game:
         self.spawn_timer = 0
         self.spawn_interval = SPAWN_INTERVAL_INITIAL
         self.blocks_destroyed = 0
+        self.falling_pieces = []  # active falling tetrominoes
+        self.fall_speed = FALL_SPEED_INITIAL
         self._spawn_ball()
-        # Spawn initial tetrominoes at the top
+        # Spawn initial tetrominoes
         for _ in range(3):
             self._spawn_tetromino()
 
@@ -278,13 +340,15 @@ class Game:
         self.ball_launched = False
 
     def _spawn_tetromino(self):
-        """Spawn a tetromino that stacks from the top of the grid downward."""
+        """Spawn a falling tetromino from the top of the grid."""
         shape_name = random.choice(list(TETROMINOES.keys()))
         offsets = TETROMINOES[shape_name]
         max_col = max(dc for _, dc in offsets)
         left_col = random.randint(0, self.grid.cols - max_col - 1)
-        row = self.grid.stack_tetromino(shape_name, left_col)
-        return row >= 0
+        piece = FallingPiece(shape_name, left_col, self.grid)
+        piece.fall_speed = self.fall_speed
+        self.falling_pieces.append(piece)
+        return True
 
     def grid_row_to_screen_y(self, grid_row):
         return GRID_TOP_Y + grid_row * CELL_SIZE
@@ -375,6 +439,10 @@ class Game:
                 SPAWN_INTERVAL_MIN,
                 SPAWN_INTERVAL_INITIAL - (self.level - 1) * 30,
             )
+            self.fall_speed = max(
+                FALL_SPEED_MIN,
+                FALL_SPEED_INITIAL - (self.level - 1),
+            )
 
     def update(self):
         if self.game_over:
@@ -395,6 +463,11 @@ class Game:
         rows_cleared = self.grid.clear_full_rows()
         if rows_cleared > 0:
             self.score += rows_cleared * 100
+
+        # Update falling pieces
+        self.falling_pieces = [p for p in self.falling_pieces if not p.landed]
+        for piece in self.falling_pieces:
+            piece.update()
 
         self.spawn_timer += 1
         if self.spawn_timer >= self.spawn_interval:
@@ -442,6 +515,26 @@ class Game:
                         (x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2)
                     )
                     highlight = tuple(min(255, c + 40) for c in color)
+                    pygame.draw.line(
+                        self.screen, highlight,
+                        (x + 1, y + 1), (x + CELL_SIZE - 2, y + 1)
+                    )
+                    pygame.draw.line(
+                        self.screen, highlight,
+                        (x + 1, y + 1), (x + 1, y + CELL_SIZE - 2)
+                    )
+
+        # Falling pieces
+        for piece in self.falling_pieces:
+            for row, col in piece.get_cells():
+                if 0 <= row < self.grid.rows and 0 <= col < self.grid.cols:
+                    x = col * CELL_SIZE
+                    y = GRID_TOP_Y + row * CELL_SIZE
+                    pygame.draw.rect(
+                        self.screen, piece.color,
+                        (x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2)
+                    )
+                    highlight = tuple(min(255, c + 40) for c in piece.color)
                     pygame.draw.line(
                         self.screen, highlight,
                         (x + 1, y + 1), (x + CELL_SIZE - 2, y + 1)

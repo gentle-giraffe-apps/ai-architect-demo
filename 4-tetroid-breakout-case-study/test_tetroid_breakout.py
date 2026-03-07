@@ -12,6 +12,7 @@ from tetroid_breakout import (
     Ball,
     Paddle,
     Game,
+    FallingPiece,
     TETROMINOES,
     COLORS,
     GRID_COLS,
@@ -25,6 +26,7 @@ from tetroid_breakout import (
     PADDLE_SPEED,
     GRID_TOP_Y,
     VISIBLE_ROWS,
+    FALL_SPEED_INITIAL,
 )
 
 
@@ -253,8 +255,9 @@ class TestGame(unittest.TestCase):
         self.assertFalse(self.game.ball_launched)
         self.assertIsNotNone(self.game.ball)
 
-    def test_initial_blocks_spawned(self):
-        self.assertGreater(self.game.grid.count_blocks(), 0)
+    def test_initial_falling_pieces(self):
+        """Initial spawn creates falling pieces."""
+        self.assertGreater(len(self.game.falling_pieces), 0)
 
     def test_not_game_over_at_start(self):
         self.assertFalse(self.game.game_over)
@@ -281,10 +284,10 @@ class TestGame(unittest.TestCase):
         self.game.update()
         self.assertNotEqual(self.game.ball.y, old_y)
 
-    def test_spawn_tetromino(self):
-        initial_blocks = self.game.grid.count_blocks()
+    def test_spawn_tetromino_creates_falling_piece(self):
+        initial_count = len(self.game.falling_pieces)
         self.game._spawn_tetromino()
-        self.assertGreaterEqual(self.game.grid.count_blocks(), initial_blocks)
+        self.assertEqual(len(self.game.falling_pieces), initial_count + 1)
 
     def test_level_up(self):
         self.game.blocks_destroyed = 20
@@ -372,6 +375,66 @@ class TestGame(unittest.TestCase):
         self.game.ball_launched = True
         for _ in range(500):
             self.game.update()
+
+
+class TestFallingPiece(unittest.TestCase):
+    def setUp(self):
+        self.grid = Grid()
+
+    def test_starts_above_grid(self):
+        piece = FallingPiece("O", 0, self.grid)
+        self.assertLessEqual(piece.row, 0)
+
+    def test_falls_down(self):
+        piece = FallingPiece("I", 0, self.grid)
+        piece.fall_speed = 1  # drop every frame
+        initial_row = piece.row
+        piece.update()
+        self.assertGreater(piece.row, initial_row)
+
+    def test_lands_on_floor(self):
+        piece = FallingPiece("I", 0, self.grid)
+        piece.fall_speed = 1
+        for _ in range(GRID_ROWS + 5):
+            piece.update()
+        self.assertTrue(piece.landed)
+
+    def test_locks_into_grid(self):
+        piece = FallingPiece("O", 0, self.grid)
+        piece.fall_speed = 1
+        for _ in range(GRID_ROWS + 5):
+            piece.update()
+        self.assertGreater(self.grid.count_blocks(), 0)
+
+    def test_lands_on_existing_blocks(self):
+        # Place blocks at the bottom
+        for col in range(GRID_COLS):
+            self.grid.cells[GRID_ROWS - 1][col] = (255, 0, 0)
+        piece = FallingPiece("I", 0, self.grid)
+        piece.fall_speed = 1
+        for _ in range(GRID_ROWS + 5):
+            piece.update()
+        self.assertTrue(piece.landed)
+        # Should have landed above the existing row
+        self.assertIsNotNone(self.grid.cells[GRID_ROWS - 2][0])
+
+    def test_get_cells(self):
+        piece = FallingPiece("O", 3, self.grid)
+        cells = piece.get_cells()
+        self.assertEqual(len(cells), 4)
+
+    def test_can_move_to_empty_grid(self):
+        piece = FallingPiece("O", 0, self.grid)
+        self.assertTrue(piece.can_move_to(0, 0))
+
+    def test_cannot_move_to_occupied(self):
+        self.grid.cells[5][0] = (255, 0, 0)
+        piece = FallingPiece("O", 0, self.grid)
+        self.assertFalse(piece.can_move_to(5, 0))
+
+    def test_cannot_move_out_of_bounds(self):
+        piece = FallingPiece("I", 0, self.grid)
+        self.assertFalse(piece.can_move_to(0, GRID_COLS))
 
 
 class TestTetrominoShapes(unittest.TestCase):
